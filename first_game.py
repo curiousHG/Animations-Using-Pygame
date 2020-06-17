@@ -39,7 +39,7 @@ hitSound = pygame.mixer.Sound("Game/hit.wav")
 music = pygame.mixer.music.load("Game/music.mp3")
 pygame.mixer.music.play(-1)
 
-score = 0
+score = -1
 
 
 class player(object):
