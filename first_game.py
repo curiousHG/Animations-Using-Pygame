@@ -1,10 +1,5 @@
 import pygame
-
-pygame.init()
-
-win = pygame.display.set_mode((500, 480))
-
-pygame.display.set_caption("First Game")
+import random
 
 g = "Game/"
 e = "E"
@@ -28,19 +23,6 @@ walkLeft = [pygame.image.load(f'{g}L1.png'),
             pygame.image.load(f'{g}L8.png'),
             pygame.image.load(f'{g}L9.png')]
 
-bg = pygame.image.load(f'{g}bg.jpg')
-char = pygame.image.load(f'{g}standing.png')
-
-clock = pygame.time.Clock()
-
-bulletSound = pygame.mixer.Sound("Game/bullet.wav")
-
-hitSound = pygame.mixer.Sound("Game/hit.wav")
-music = pygame.mixer.music.load("Game/music.mp3")
-pygame.mixer.music.play(-1)
-
-score = -1
-
 
 class player(object):
     def __init__(self, x, y, width, height):
@@ -61,7 +43,7 @@ class player(object):
         if self.walkCount + 1 >= 27:
             self.walkCount = 0
 
-        if not (self.standing):
+        if not self.standing:
             if self.left:
                 win.blit(walkLeft[self.walkCount // 3], (self.x, self.y))
                 self.walkCount += 1
@@ -76,7 +58,7 @@ class player(object):
         self.hitbox = (self.x + 17, self.y + 11, 29, 52)
         # pygame.draw.rect(win, (255,0,0), self.hitbox,2)
 
-    def hit(self):
+    def hit(self, win):
         self.isJump = False
         self.jumpCount = 10
         self.x = 100
@@ -184,107 +166,130 @@ class enemy(object):
             self.health -= 1
         else:
             self.visible = False
-        print('hit')
 
 
-def redrawGameWindow():
-    win.blit(bg, (0, 0))
-    text = font.render('Score: ' + str(score), 1, (0, 0, 0))
-    win.blit(text, (350, 10))
-    man.draw(win)
-    goblin.draw(win)
-    for bullet in bullets:
-        bullet.draw(win)
+class Game:
+    def __init__(self):
+        pygame.init()
+        self.win = pygame.display.set_mode((500, 480))
+        pygame.display.set_caption("First Game")
+        self.bg = pygame.image.load(f'{g}bg.jpg')
+        self.char = pygame.image.load(f'{g}standing.png')
+        self.clock = pygame.time.Clock()
+        self.bulletSound = pygame.mixer.Sound("Game/bullet.wav")
+        self.hitSound = pygame.mixer.Sound("Game/hit.wav")
+        self.score = 0
+        self.font = pygame.font.SysFont('comicsans', 30, True)
+        self.shootLoop = 0
+        self.bullets = []
+        self.run = True
+        self.man = player(200, 410, 64, 64)
+        self.goblin = enemy(100, 410, 64, 64, 450)
 
-    pygame.display.update()
+    def redrawGameWindow(self):
+        self.win.blit(self.bg, (0, 0))
+        text = self.font.render('Score: ' + str(self.score), 1, (0, 0, 0))
+        self.win.blit(text, (350, 10))
+        self.man.draw(self.win)
+        self.goblin.draw(self.win)
+        for bullet in self.bullets:
+            bullet.draw(self.win)
+
+        pygame.display.update()
+
+    def Run(self):
+        while self.run:
+            self.clock.tick(27)
+            if self.goblin.visible:
+                if self.man.hitbox[1] < self.goblin.hitbox[1] + self.goblin.hitbox[3] and self.man.hitbox[1] + \
+                        self.man.hitbox[3] > self.goblin.hitbox[1]:
+                    if self.man.hitbox[0] + self.man.hitbox[2] > self.goblin.hitbox[0] and self.man.hitbox[0] < \
+                            self.goblin.hitbox[0] + self.goblin.hitbox[2]:
+                        self.man.hit(self.win)
+
+                        self.goblin.x = random.randint(0,self.man.x-60)
+                        self.score -= 5
+            if self.shootLoop > 0:
+                self.shootLoop += 1
+            if self.shootLoop > 3:
+                self.shootLoop = 0
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.run = False
+
+            for bullet in self.bullets:
+                if bullet.y - bullet.radius < self.goblin.hitbox[1] + self.goblin.hitbox[
+                    3] and bullet.y + bullet.radius > self.goblin.hitbox[1]:
+                    if bullet.x + bullet.radius > self.goblin.hitbox[0] and bullet.x - bullet.radius < \
+                            self.goblin.hitbox[0] + self.goblin.hitbox[2]:
+                        self.hitSound.play()
+                        self.goblin.hit()
+                        self.score += 1
+                        self.bullets.pop(self.bullets.index(bullet))
+
+                if 500 > bullet.x > 0:
+                    bullet.x += bullet.vel
+                else:
+                    self.bullets.pop(self.bullets.index(bullet))
+
+            if not self.goblin.visible:
+                self.goblin.health = 10
+                self.goblin.visible = True
+
+                self.goblin.x = random.randint(0, 300)
+
+            keys = pygame.key.get_pressed()
+
+            if keys[pygame.K_SPACE] and self.shootLoop == 0:
+                self.bulletSound.play()
+                if self.man.left:
+                    facing = -1
+                else:
+                    facing = 1
+
+                if len(self.bullets) < 5:
+                    self.bullets.append(
+                        projectile(round(self.man.x + self.man.width // 2), round(self.man.y + self.man.height // 2), 6,
+                                   (0, 0, 0), facing))
+
+                self.shootLoop = 1
+
+            if keys[pygame.K_LEFT] and self.man.x > self.man.vel:
+                self.man.x -= self.man.vel
+                self.man.left = True
+                self.man.right = False
+                self.man.standing = False
+            elif keys[pygame.K_RIGHT] and self.man.x < 500 - self.man.width - self.man.vel:
+                self.man.x += self.man.vel
+                self.man.right = True
+                self.man.left = False
+                self.man.standing = False
+            else:
+                self.man.standing = True
+                self.man.walkCount = 0
+
+            if not self.man.isJump:
+                if keys[pygame.K_UP]:
+                    self.man.isJump = True
+                    self.man.right = False
+                    self.man.left = False
+                    self.man.walkCount = 0
+            else:
+                if self.man.jumpCount >= -10:
+                    neg = 1
+                    if self.man.jumpCount < 0:
+                        neg = -1
+                    self.man.y -= (self.man.jumpCount ** 2) * 0.5 * neg
+                    self.man.jumpCount -= 1
+                else:
+                    self.man.isJump = False
+                    self.man.jumpCount = 10
+
+            self.redrawGameWindow()
 
 
-# mainloop
-font = pygame.font.SysFont('comicsans', 30, True)
-man = player(200, 410, 64, 64)
-goblin = enemy(100, 410, 64, 64, 450)
-shootLoop = 0
-bullets = []
-run = True
-while run:
-    clock.tick(27)
-
-    if goblin.visible == True:
-        if man.hitbox[1] < goblin.hitbox[1] + goblin.hitbox[3] and man.hitbox[1] + man.hitbox[3] > goblin.hitbox[1]:
-            if man.hitbox[0] + man.hitbox[2] > goblin.hitbox[0] and man.hitbox[0] < goblin.hitbox[0] + goblin.hitbox[2]:
-                man.hit()
-                score -= 5
-
-    if shootLoop > 0:
-        shootLoop += 1
-    if shootLoop > 3:
-        shootLoop = 0
-
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            run = False
-
-    for bullet in bullets:
-        if bullet.y - bullet.radius < goblin.hitbox[1] + goblin.hitbox[3] and bullet.y + bullet.radius > goblin.hitbox[
-            1]:
-            if bullet.x + bullet.radius > goblin.hitbox[0] and bullet.x - bullet.radius < goblin.hitbox[0] + \
-                    goblin.hitbox[2]:
-                hitSound.play()
-                goblin.hit()
-                score += 1
-                bullets.pop(bullets.index(bullet))
-
-        if bullet.x < 500 and bullet.x > 0:
-            bullet.x += bullet.vel
-        else:
-            bullets.pop(bullets.index(bullet))
-
-    keys = pygame.key.get_pressed()
-
-    if keys[pygame.K_SPACE] and shootLoop == 0:
-        bulletSound.play()
-        if man.left:
-            facing = -1
-        else:
-            facing = 1
-
-        if len(bullets) < 5:
-            bullets.append(
-                projectile(round(man.x + man.width // 2), round(man.y + man.height // 2), 6, (0, 0, 0), facing))
-
-        shootLoop = 1
-
-    if keys[pygame.K_LEFT] and man.x > man.vel:
-        man.x -= man.vel
-        man.left = True
-        man.right = False
-        man.standing = False
-    elif keys[pygame.K_RIGHT] and man.x < 500 - man.width - man.vel:
-        man.x += man.vel
-        man.right = True
-        man.left = False
-        man.standing = False
-    else:
-        man.standing = True
-        man.walkCount = 0
-
-    if not (man.isJump):
-        if keys[pygame.K_UP]:
-            man.isJump = True
-            man.right = False
-            man.left = False
-            man.walkCount = 0
-    else:
-        if man.jumpCount >= -10:
-            neg = 1
-            if man.jumpCount < 0:
-                neg = -1
-            man.y -= (man.jumpCount ** 2) * 0.5 * neg
-            man.jumpCount -= 1
-        else:
-            man.isJump = False
-            man.jumpCount = 10
-
-    redrawGameWindow()
+game = Game()
+game.Run()
 
 pygame.quit()
