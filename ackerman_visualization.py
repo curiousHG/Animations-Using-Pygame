@@ -77,7 +77,7 @@ class Display:
             self.win.fill(black)
 
             self.drawWindow()
-            M, N = 3,3
+            M, N = 4,3
             if (M, N) not in self.d:
                 t = self.ack(M, N)
                 self.d[M, N] = t
